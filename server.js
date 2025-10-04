@@ -10,12 +10,12 @@ const client = new MongoClient(process.env.MONGO_URI);
 let videosCollection;
 
 client.connect().then(() => {
-  const db = client.db("myvideo"); // 数据库名字（你可以改）
-  videosCollection = db.collection("videos"); // 集合（表）
+  const db = client.db("myvideo"); // 数据库名字
+  videosCollection = db.collection("videos"); // 表
   console.log("✅ MongoDB connected!");
 });
 
-// 视频上传配置（上传到 Render 的临时目录）
+// 上传配置
 const upload = multer({ dest: "uploads/" });
 
 // 根路由
@@ -36,7 +36,7 @@ app.post("/upload", upload.single("video"), async (req, res) => {
   res.json({ message: "Upload successful", video: videoInfo });
 });
 
-// 获取视频列表
+// 视频列表
 app.get("/list", async (req, res) => {
   const videos = await videosCollection.find().toArray();
   res.json(videos);
