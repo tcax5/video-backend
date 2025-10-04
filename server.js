@@ -1,35 +1,48 @@
 const express = require("express");
 const multer = require("multer");
-const fs = require("fs");
+const { MongoClient } = require("mongodb");
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 存视频的目录
-const uploadDir = "uploads";
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+// MongoDB 连接
+const client = new MongoClient(process.env.MONGO_URI);
+let videosCollection;
 
-// 配置上传
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+client.connect().then(() => {
+  const db = client.db("myvideo"); // 数据库名字（你可以改）
+  videosCollection = db.collection("videos"); // 集合（表）
+  console.log("✅ MongoDB connected!");
 });
-const upload = multer({ storage });
 
-// 静态文件服务（返回视频）
-app.use("/uploads", express.static(uploadDir));
+// 视频上传配置（上传到 Render 的临时目录）
+const upload = multer({ dest: "uploads/" });
+
+// 根路由
+app.get("/", (req, res) => {
+  res.send("✅ Video backend is running with MongoDB!");
+});
 
 // 上传接口
-app.post("/upload", upload.single("video"), (req, res) => {
-  res.json({ path: "/uploads/" + req.file.filename });
+app.post("/upload", upload.single("video"), async (req, res) => {
+  const videoInfo = {
+    filename: req.file.filename,
+    originalName: req.file.originalname,
+    uploadDate: new Date(),
+  };
+
+  await videosCollection.insertOne(videoInfo);
+
+  res.json({ message: "Upload successful", video: videoInfo });
 });
 
-// 视频列表接口
-app.get("/list", (req, res) => {
-  fs.readdir(uploadDir, (err, files) => {
-    if (err) return res.json([]);
-    res.json(files.map(f => "/uploads/" + f));
-  });
+// 获取视频列表
+app.get("/list", async (req, res) => {
+  const videos = await videosCollection.find().toArray();
+  res.json(videos);
 });
 
-app.listen(port, () => console.log(`Server running on ${port}`));
+// 启动服务
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
+});
